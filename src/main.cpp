@@ -1,13 +1,6 @@
 #include <Arduino.h>
 #include <TurtleReceiver.h>
 
-// Function declarations
-void moveForward(int speed);
-void moveBackward(int speed);
-void turnLeft(int speed);
-void turnRight(int speed);
-void stopMotors();
-
 // Motor A (Left) pins
 #define ENA 14
 #define IN1 27
@@ -24,9 +17,28 @@ void stopMotors();
 #define PWM_CHANNEL_A 0
 #define PWM_CHANNEL_B 1
 
+// Create controller object
+NetController controller;
+
+// Function declarations
+// Function declarations
+void moveForward(int speed);
+void moveBackward(int speed);
+void turnLeft(int speed);
+void turnRight(int speed);
+void stopMotors();
+void setMotorSpeed(int leftSpeed, int rightSpeed);  // Add this line
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Robot Starting...");
+  
+  // Print MAC address for controller pairing
+  Serial.println("Your MAC Address:");
+  printMacAddress();
+  
+  // Setup controller
+  controller.controllerSetup();
   
   // Set motor control pins as outputs
   pinMode(IN1, OUTPUT);
@@ -41,83 +53,61 @@ void setup() {
   ledcAttachPin(ENB, PWM_CHANNEL_B);
   
   stopMotors();
-  Serial.println("Ready!");
+  Serial.println("Ready! Send MAC address to controller team.");
 }
 
 void loop() {
-  // Test sequence - will run when you connect battery
-  Serial.println("Forward");
-  moveForward(200);
-  delay(2000);
+  // Get joystick values
+  float joyX = controller.getJoy1X();  // Left/Right: -1 to 1
+  float joyY = controller.getJoy1Y();  // Forward/Back: -1 to 1
   
-  Serial.println("Stop");
-  stopMotors();
-  delay(1000);
+  // Convert joystick to motor speeds
+  int baseSpeed = 200;  // Max speed
   
-  Serial.println("Backward");
-  moveBackward(200);
-  delay(2000);
+  // Calculate left and right motor speeds based on joystick
+  int leftSpeed = (joyY + joyX) * baseSpeed;
+  int rightSpeed = (joyY - joyX) * baseSpeed;
   
-  Serial.println("Stop");
-  stopMotors();
-  delay(1000);
+  // Constrain speeds to -255 to 255
+  leftSpeed = constrain(leftSpeed, -255, 255);
+  rightSpeed = constrain(rightSpeed, -255, 255);
   
-  Serial.println("Turn Left");
-  turnLeft(200);
-  delay(1000);
+  // Apply motor speeds
+  setMotorSpeed(leftSpeed, rightSpeed);
   
-  Serial.println("Stop");
-  stopMotors();
-  delay(1000);
-  
-  Serial.println("Turn Right");
-  turnRight(200);
-  delay(1000);
-  
-  Serial.println("Stop");
-  stopMotors();
-  delay(2000);
+  delay(20);  // Small delay for stability
 }
 
-// Movement functions
-void moveForward(int speed) {
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-  ledcWrite(PWM_CHANNEL_A, speed);
+void setMotorSpeed(int leftSpeed, int rightSpeed) {
+  // Left motor
+  if (leftSpeed > 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    ledcWrite(PWM_CHANNEL_A, abs(leftSpeed));
+  } else if (leftSpeed < 0) {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    ledcWrite(PWM_CHANNEL_A, abs(leftSpeed));
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    ledcWrite(PWM_CHANNEL_A, 0);
+  }
   
-  digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);
-  ledcWrite(PWM_CHANNEL_B, speed);
-}
-
-void moveBackward(int speed) {
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-  ledcWrite(PWM_CHANNEL_A, speed);
-  
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, HIGH);
-  ledcWrite(PWM_CHANNEL_B, speed);
-}
-
-void turnLeft(int speed) {
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-  ledcWrite(PWM_CHANNEL_A, speed);
-  
-  digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);
-  ledcWrite(PWM_CHANNEL_B, speed);
-}
-
-void turnRight(int speed) {
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-  ledcWrite(PWM_CHANNEL_A, speed);
-  
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, HIGH);
-  ledcWrite(PWM_CHANNEL_B, speed);
+  // Right motor
+  if (rightSpeed > 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+    ledcWrite(PWM_CHANNEL_B, abs(rightSpeed));
+  } else if (rightSpeed < 0) {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+    ledcWrite(PWM_CHANNEL_B, abs(rightSpeed));
+  } else {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    ledcWrite(PWM_CHANNEL_B, 0);
+  }
 }
 
 void stopMotors() {
