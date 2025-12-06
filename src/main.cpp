@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <TurtleReceiver.h>
+#include <ESP32Servo.h>
 
 // Motor A (Left) pins
 #define ENA 14
@@ -11,23 +12,26 @@
 #define IN3 25
 #define IN4 33
 
-// PWM settings
+// Servo pin
+#define SERVO_PIN 13
+
+// PWM settings for motors
 #define PWM_FREQ 5000
 #define PWM_RESOLUTION 8
 #define PWM_CHANNEL_A 0
 #define PWM_CHANNEL_B 1
 
-// Create controller object
+// Create controller and servo objects
 NetController controller;
+Servo clawServo;
+
+// Servo positions
+int clawOpen = 180;    // Adjust these values based on your servo
+int clawClosed = 0;    // Test to find the right angles
 
 // Function declarations
-// Function declarations
-void moveForward(int speed);
-void moveBackward(int speed);
-void turnLeft(int speed);
-void turnRight(int speed);
+void setMotorSpeed(int leftSpeed, int rightSpeed);
 void stopMotors();
-void setMotorSpeed(int leftSpeed, int rightSpeed);  // Add this line
 
 void setup() {
   Serial.begin(115200);
@@ -39,6 +43,11 @@ void setup() {
   
   // Setup controller
   controller.controllerSetup();
+  
+  // Setup servo
+  clawServo.attach(SERVO_PIN);
+  clawServo.write(clawOpen);  // Start with claw open
+  Serial.println("Servo attached to pin 13");
   
   // Set motor control pins as outputs
   pinMode(IN1, OUTPUT);
@@ -53,16 +62,19 @@ void setup() {
   ledcAttachPin(ENB, PWM_CHANNEL_B);
   
   stopMotors();
-  Serial.println("Ready! Send MAC address to controller team.");
+  Serial.println("Ready! Controls:");
+  Serial.println("Left Joystick = Drive");
+  Serial.println("A Button = Open Claw");
+  Serial.println("B Button = Close Claw");
 }
 
 void loop() {
-  // Get joystick values
+  // Get joystick values for driving
   float joyX = controller.getJoy1X();  // Left/Right: -1 to 1
   float joyY = controller.getJoy1Y();  // Forward/Back: -1 to 1
   
   // Convert joystick to motor speeds
-  int baseSpeed = 200;  // Max speed
+  int baseSpeed = 200;  // Max speed (adjust 0-255)
   
   // Calculate left and right motor speeds based on joystick
   int leftSpeed = (joyY + joyX) * baseSpeed;
@@ -74,6 +86,17 @@ void loop() {
   
   // Apply motor speeds
   setMotorSpeed(leftSpeed, rightSpeed);
+  
+  // Claw control with A and B buttons
+  if (controller.getA()) {
+    clawServo.write(clawOpen);
+    Serial.println("Claw OPEN");
+  }
+  
+  if (controller.getB()) {
+    clawServo.write(clawClosed);
+    Serial.println("Claw CLOSED");
+  }
   
   delay(20);  // Small delay for stability
 }
